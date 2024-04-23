@@ -1201,7 +1201,10 @@ public class ParquetFileWriter {
     LOG.debug("{}: end", out.getPos());
     this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
     serializeFooter(footer, out, fileEncryptor, metadataConverter);
-    out.close();
+    
+    try (PositionOutputStream temp = out) {
+      temp.flush();
+    }
   }
 
   private static void serializeColumnIndexes(
@@ -1502,10 +1505,11 @@ public class ParquetFileWriter {
   @Deprecated
   private static void writeMetadataFile(Path outputPath, ParquetMetadata metadataFooter, FileSystem fs)
       throws IOException {
-    PositionOutputStream metadata = HadoopStreams.wrap(fs.create(outputPath));
-    metadata.write(MAGIC);
-    serializeFooter(metadataFooter, metadata, null, new ParquetMetadataConverter());
-    metadata.close();
+    try (PositionOutputStream metadata = HadoopStreams.wrap(fs.create(outputPath))) {
+      metadata.write(MAGIC);
+      serializeFooter(metadataFooter, metadata, null, new ParquetMetadataConverter());
+      metadata.flush();
+    }
   }
 
   /**
