@@ -1194,16 +1194,18 @@ public class ParquetFileWriter {
    * @throws IOException if there is an error while writing
    */
   public void end(Map<String, String> extraMetaData) throws IOException {
-    state = state.end();
-    serializeColumnIndexes(columnIndexes, blocks, out, fileEncryptor);
-    serializeOffsetIndexes(offsetIndexes, blocks, out, fileEncryptor);
-    serializeBloomFilters(bloomFilters, blocks, out, fileEncryptor);
-    LOG.debug("{}: end", out.getPos());
-    this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
-    serializeFooter(footer, out, fileEncryptor, metadataConverter);
-    
-    try (PositionOutputStream temp = out) {
-      temp.flush();
+    try {
+      state = state.end();
+      serializeColumnIndexes(columnIndexes, blocks, out, fileEncryptor);
+      serializeOffsetIndexes(offsetIndexes, blocks, out, fileEncryptor);
+      serializeBloomFilters(bloomFilters, blocks, out, fileEncryptor);
+      LOG.debug("{}: end", out.getPos());
+      this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
+      serializeFooter(footer, out, fileEncryptor, metadataConverter);
+    } finally {
+      try (PositionOutputStream temp = out) {
+        temp.flush();
+      }
     }
   }
 
