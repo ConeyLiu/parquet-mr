@@ -1194,14 +1194,19 @@ public class ParquetFileWriter {
    * @throws IOException if there is an error while writing
    */
   public void end(Map<String, String> extraMetaData) throws IOException {
-    state = state.end();
-    serializeColumnIndexes(columnIndexes, blocks, out, fileEncryptor);
-    serializeOffsetIndexes(offsetIndexes, blocks, out, fileEncryptor);
-    serializeBloomFilters(bloomFilters, blocks, out, fileEncryptor);
-    LOG.debug("{}: end", out.getPos());
-    this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
-    serializeFooter(footer, out, fileEncryptor, metadataConverter);
-    out.close();
+    try {
+      state = state.end();
+      serializeColumnIndexes(columnIndexes, blocks, out, fileEncryptor);
+      serializeOffsetIndexes(offsetIndexes, blocks, out, fileEncryptor);
+      serializeBloomFilters(bloomFilters, blocks, out, fileEncryptor);
+      LOG.debug("{}: end", out.getPos());
+      this.footer = new ParquetMetadata(new FileMetaData(schema, extraMetaData, Version.FULL_VERSION), blocks);
+      serializeFooter(footer, out, fileEncryptor, metadataConverter);
+    } finally {
+      try (PositionOutputStream temp = out) {
+        temp.flush();
+      }
+    }
   }
 
   private static void serializeColumnIndexes(
@@ -1502,10 +1507,11 @@ public class ParquetFileWriter {
   @Deprecated
   private static void writeMetadataFile(Path outputPath, ParquetMetadata metadataFooter, FileSystem fs)
       throws IOException {
-    PositionOutputStream metadata = HadoopStreams.wrap(fs.create(outputPath));
-    metadata.write(MAGIC);
-    serializeFooter(metadataFooter, metadata, null, new ParquetMetadataConverter());
-    metadata.close();
+    try (PositionOutputStream metadata = HadoopStreams.wrap(fs.create(outputPath))) {
+      metadata.write(MAGIC);
+      serializeFooter(metadataFooter, metadata, null, new ParquetMetadataConverter());
+      metadata.flush();
+    }
   }
 
   /**
